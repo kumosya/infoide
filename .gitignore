@@ -1,0 +1,5 @@
+tests/
+build/
+resources/*.iso
+resources/*.img
+resources/sdk
