@@ -70,6 +70,7 @@ done
 for tool in g++ gcc debugfs flock qemu-system-x86_64; do
     command -v "$tool" >/dev/null 2>&1 || { echo "missing host dependency: $tool" >&2; exit 1; }
 done
+command -v "${INPKG:-inpkg}" >/dev/null 2>&1 || { echo 'missing host dependency: inpkg; install it or set INPKG=/path/to/inpkg' >&2; exit 1; }
 target="$destdir/usr/local"
 resources="$target/lib/osinfo"
 install -d "$target/bin" "$resources/sdk"

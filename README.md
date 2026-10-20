@@ -13,10 +13,12 @@ resources/
   osinfo.iso      # 可选光盘镜像
 ```
 
+InfoIDE 依赖 inpkg 的 Linux 可执行程序。先在 inpkg 源码目录执行 `sudo make install`，将 `inpkg` 安装到 `/usr/local/bin`；也可用 `make install PREFIX=/usr DESTDIR=/暂存目录` 暂存安装。开发时可用 `make INPKG=/path/to/inpkg` 指定可执行文件。
+
 ```sh
 make installer                 # 默认仅携带硬盘模板
 make check check-install       # CLI 与安装器验证
-sudo make install              # 安装 InfoIDE；所有操作均在 InfoIDE 项目执行
+sudo make install              # 安装 InfoIDE（需先安装 inpkg）
 ```
 
 也可用 `make installer SDK=/path/to/sdk DISK=/path/to/osinfo.img` 指定输入。发行包为 InfoIDE 项目的 build/infoide-linux.tar.gz，解压并运行 `sudo sh infoide-linux/install.sh` 也可以安装。`make install DESTDIR=/暂存目录` 支持其他目录的安装验证。
@@ -33,7 +35,7 @@ sudo make install              # 安装 InfoIDE；所有操作均在 InfoIDE 项
   osinfo.iso       # 可选
 ```
 
-安装器支持 `--destdir DIR` 暂存打包，不改默认安装路径。宿主需有 gcc/g++、debugfs、flock、QEMU；选用光盘时另需 xorriso 和 grub-mkrescue。开发、更新项目镜像和运行 QEMU 均无需 root。包核心内置于 InfoIDE，无需另带 inpkg 程序。
+安装器支持 `--destdir DIR` 暂存打包，不改默认安装路径。宿主需有 gcc/g++、debugfs、flock、QEMU 和 PATH 中的 inpkg；选用光盘时另需 xorriso 和 grub-mkrescue。卸载 InfoIDE 不会移除共享的 inpkg 程序。
 
 卸载在 InfoIDE 项目执行 `sudo make uninstall`。也可使用已安装的 `sudo sh /usr/local/lib/osinfo/uninstall.sh`，或解压发行包后运行 `sudo sh infoide-linux/uninstall.sh`。暂存安装对应 `make uninstall DESTDIR=/暂存目录` 或卸载脚本的 `--destdir DIR`。卸载仅清理 /usr/local/bin/infoide 与专用的 /usr/local/lib/osinfo/，保留各项目源码、配置和 IMG/ISO；重复卸载可安全执行。
 

@@ -4,10 +4,10 @@ SDK ?= $(if $(OSINFO_SDK),$(OSINFO_SDK),resources/sdk)
 DISK ?= $(if $(OSINFO_DISK),$(OSINFO_DISK),resources/osinfo.img)
 WITH_CDROM ?= 0
 ISO ?= $(if $(OSINFO_ISO),$(OSINFO_ISO),$(if $(filter 1,$(WITH_CDROM)),resources/osinfo.iso))
-INPKG_SOURCE ?= ../inpkg
-PACKAGE_SOURCES := $(wildcard $(INPKG_SOURCE)/src/common/*.cc) $(INPKG_SOURCE)/src/linux/fs.cc $(INPKG_SOURCE)/src/linux/main.cc
+INPKG ?= $(if $(wildcard ../inpkg/build/linux/inpkg),../inpkg/build/linux/inpkg,inpkg)
+INPKG_ENV = $(if $(findstring /,$(INPKG)),$(abspath $(INPKG)),$(INPKG))
 
-.PHONY: all check check-install check-project check-optical install uninstall installer distribution
+.PHONY: all check check-install check-project check-optical check-inpkg install uninstall installer distribution
 all: build/infoide
 
 build/uninstall-script.h: script/uninstall.sh Makefile
@@ -15,23 +15,26 @@ build/uninstall-script.h: script/uninstall.sh Makefile
 	@{ printf '%s' 'R"SH('; cat "$<"; printf '%s\n' ')SH"'; } >"$@.tmp"
 	@mv "$@.tmp" "$@"
 
-build/infoide: src/main.cc $(wildcard src/*.h) build/uninstall-script.h $(PACKAGE_SOURCES) $(INPKG_SOURCE)/src/common/package.h $(INPKG_SOURCE)/include/inpkg/gzip.h Makefile
+build/infoide: src/main.cc $(wildcard src/*.h) build/uninstall-script.h Makefile
 	@mkdir -p "$(@D)"
 	@set -eu; temporary="$@.tmp.$$$$"; trap 'rm -f "$$temporary"' EXIT; \
-		$(CXX) $(CXXFLAGS) -DINPKG_EMBEDDED -Ibuild -I"$(INPKG_SOURCE)/src/common" -I"$(INPKG_SOURCE)/include" src/main.cc $(PACKAGE_SOURCES) -o "$$temporary"; mv "$$temporary" "$@"
+		$(CXX) $(CXXFLAGS) -Ibuild src/main.cc -o "$$temporary"; mv "$$temporary" "$@"
 
-check: build/infoide
-	OSINFO_SDK="$(abspath $(SDK))" sh "tests/cli.sh" "$(CURDIR)/build/infoide"
+check-inpkg:
+	@command -v "$(INPKG)" >/dev/null 2>&1 || test -x "$(INPKG)" || { echo "missing host dependency: inpkg; install it or set INPKG=/path/to/inpkg" >&2; exit 1; }
 
-check-install: distribution
-	OSINFO_EXPECT_CDROM="$(if $(ISO),1,0)" sh tests/distribution.sh
+check: build/infoide check-inpkg
+	INPKG="$(INPKG_ENV)" OSINFO_SDK="$(abspath $(SDK))" sh "tests/cli.sh" "$(CURDIR)/build/infoide"
 
-check-project: build/infoide
-	OSINFO_SDK="$(abspath $(SDK))" OSINFO_DISK="$(abspath $(DISK))" sh tests/project.sh
+check-install: distribution check-inpkg
+	INPKG="$(INPKG_ENV)" OSINFO_EXPECT_CDROM="$(if $(ISO),1,0)" sh tests/distribution.sh
 
-check-optical: build/infoide
+check-project: build/infoide check-inpkg
+	INPKG="$(INPKG_ENV)" OSINFO_SDK="$(abspath $(SDK))" OSINFO_DISK="$(abspath $(DISK))" sh tests/project.sh
+
+check-optical: build/infoide check-inpkg
 	@test -n "$(ISO)" || { echo 'Set WITH_CDROM=1 or ISO=/path/to/osinfo.iso' >&2; exit 2; }
-	OSINFO_SDK="$(abspath $(SDK))" OSINFO_DISK="$(abspath $(DISK))" OSINFO_ISO="$(abspath $(ISO))" sh tests/optical.sh
+	INPKG="$(INPKG_ENV)" OSINFO_SDK="$(abspath $(SDK))" OSINFO_DISK="$(abspath $(DISK))" OSINFO_ISO="$(abspath $(ISO))" sh tests/optical.sh
 
 installer: distribution
 

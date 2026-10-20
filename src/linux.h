@@ -48,8 +48,8 @@ class Bundle {
             const auto name = fs::path(input).filename().string(); Files::relative(name);
             if (fs::path(name).extension() != ".inpk" || !names.insert(name).second) throw std::runtime_error("duplicate or invalid bundle member");
             PackageTools::run({"inpkg", "check", fs::absolute(input).string()});
-            inpkg::Bytes data;
-            if (!inpkg::hostRead(input.c_str(), data) || data.size() > 512 * 1024 * 1024 || output.size() + data.size() > 0xffff0000ULL) throw std::runtime_error("bundle too large");
+            const auto data = Files::readBytes(input);
+            if (data.size() > 512 * 1024 * 1024 || output.size() + data.size() > 0xffff0000ULL) throw std::runtime_error("bundle too large");
             uint32_t crc = UINT32_MAX;
             for (auto byte : data) { crc ^= byte; for (unsigned bit = 0; bit < 8; ++bit) crc = (crc >> 1) ^ (0xedb88320U & (0U - (crc & 1))); }
             Member member{name, crc ^ UINT32_MAX, static_cast<uint32_t>(data.size()), static_cast<uint32_t>(output.size())};
@@ -80,9 +80,8 @@ class FilesystemImage {
         for (const auto& entry : fs::recursive_directory_iterator(root)) {
             if (entry.is_symlink()) throw std::runtime_error("linked image payload");
             if (!entry.is_regular_file()) continue;
-            inpkg::Bytes bytes;
-            if (!inpkg::hostRead(entry.path().c_str(), bytes)) throw std::runtime_error("cannot read image payload");
-            result[entry.path().lexically_relative(root).generic_string()] = inpkg::digest(bytes) + ":" + std::to_string(static_cast<unsigned>(entry.status().permissions()) & 0777);
+            const auto bytes = Files::readBytes(entry.path());
+            result[entry.path().lexically_relative(root).generic_string()] = Files::digest(bytes) + ":" + std::to_string(static_cast<unsigned>(entry.status().permissions()) & 0777);
         }
         return result;
     }
