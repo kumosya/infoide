@@ -95,7 +95,7 @@ class FilesystemImage {
         return output + '"';
     }
  public:
-    static void install(const fs::path& image, const fs::path& archive, const fs::path& stage) {
+    static void install(const fs::path& image, const Arguments& archives, const fs::path& stage) {
         if (!Process::available("debugfs")) throw std::runtime_error("missing host tool: debugfs");
         const auto root = stage / "root";
         fs::create_directories(root);
@@ -105,7 +105,10 @@ class FilesystemImage {
         const auto before = inventory(root);
         std::set<std::string> directories;
         for (const auto& entry : fs::recursive_directory_iterator(root)) if (entry.is_directory()) directories.insert(entry.path().lexically_relative(root).generic_string());
-        PackageTools::run({"inpkg", "upgrade", fs::canonical(archive).string(), "--install-missing", "--sysroot", root.string(), "-y"});
+        Arguments command{"inpkg", "upgrade"};
+        command.insert(command.end(), archives.begin(), archives.end());
+        command.insert(command.end(), {"--install-missing", "--sysroot", root.string(), "-y"});
+        PackageTools::run(command);
         const auto after = inventory(root);
         std::ostringstream batch;
         for (const auto& entry : fs::recursive_directory_iterator(root)) if (entry.is_directory()) {
@@ -136,14 +139,14 @@ class FilesystemImage {
 
 class OpticalImage {
  public:
-    static void install(const fs::path& source, const fs::path& output, const fs::path& archive) {
+    static void install(const fs::path& source, const fs::path& output, const Arguments& archives) {
         for (const auto* tool : {"xorriso", "grub-mkrescue"}) if (!Process::available(tool)) throw std::runtime_error(std::string("missing host tool: ") + tool);
         if (fs::weakly_canonical(source) == fs::weakly_canonical(output)) throw std::runtime_error("output ISO must differ from base ISO");
         TemporaryDirectory temporary;
         const auto stage = temporary.path(), cd = stage / "cd", image = cd / "boot/rootfs.ext3";
         Process::run({"xorriso", "-osirrox", "on", "-indev", fs::canonical(source).string(), "-extract", "/", cd.string()}, stage);
         if (!fs::is_regular_file(image)) throw std::runtime_error("base ISO has no /boot/rootfs.ext3");
-        FilesystemImage::install(image, archive, stage);
+        FilesystemImage::install(image, archives, stage);
         TemporaryFile result(fs::absolute(output));
         Process::run({"grub-mkrescue", "-o", result.path().string(), cd.string()}, stage);
         result.publish(fs::absolute(output));

@@ -64,7 +64,7 @@ class DiskImage {
         output.flush();
         if (!output) throw std::runtime_error("disk image write failed");
     }
-    static void install(const fs::path& base, const fs::path& output, const fs::path& archive) {
+    static void install(const fs::path& base, const fs::path& output, const Arguments& archives) {
         if (!base.empty() && fs::weakly_canonical(base) == fs::weakly_canonical(output)) throw std::runtime_error("project disk must differ from template");
         const auto source = fs::exists(output) ? fs::canonical(output) : fs::canonical(base);
         FileLock sourceLock(source, fs::exists(output));
@@ -73,7 +73,7 @@ class DiskImage {
         const auto stage = temporary.path(), filesystem = stage / "root.ext3";
         Files::write(filesystem, ""); fs::resize_file(filesystem, partition.size);
         copyRange(source, partition.offset, partition.size, filesystem, 0);
-        FilesystemImage::install(filesystem, archive, stage);
+        FilesystemImage::install(filesystem, archives, stage);
         TemporaryFile result(output);
         fs::copy_file(source, result.path(), fs::copy_options::overwrite_existing);
         copyRange(filesystem, 0, partition.size, result.path(), partition.offset);

@@ -1,4 +1,5 @@
-tests/
+tests/*
+!tests/dependencies.sh
 build/
 resources/*.iso
 resources/*.img

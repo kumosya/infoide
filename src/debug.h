@@ -16,6 +16,7 @@ class DebugConfiguration {
     }
  public:
     std::string boot, qemu, display, serial;
+    Arguments dependencies;
     fs::path image;
     uint32_t memory, cpus, gdbPort;
     bool waitForGdb;
@@ -24,6 +25,16 @@ class DebugConfiguration {
         if (!options.debugConfig.empty()) path = fs::path(options.debugConfig).is_absolute() ? fs::path(options.debugConfig) : root / options.debugConfig;
         if (!fs::exists(path) && options.debugConfig.empty()) create(root);
         const auto config = Json::parse(Files::read(path));
+        std::set<fs::path> seen;
+        for (const auto& dependency : config.strings("dependencies")) {
+            const auto package = fs::path(dependency).is_absolute() ? fs::path(dependency) : root / dependency;
+            if (dependency.empty() || dependency.find('\0') != std::string::npos ||
+                package.extension() != ".inpk" || !fs::is_regular_file(package))
+                throw std::runtime_error("missing or invalid dependency package: " + dependency);
+            const auto canonical = fs::canonical(package);
+            if (!seen.insert(canonical).second) throw std::runtime_error("duplicate dependency package: " + dependency);
+            dependencies.push_back(canonical.string());
+        }
         boot = options.boot.empty() ? config.text("boot", "disk") : options.boot;
         if (boot != "disk" && boot != "cdrom") throw std::runtime_error("boot must be disk or cdrom");
         const bool disk = boot == "disk";
@@ -69,6 +80,7 @@ class DebugConfiguration {
   "iso_template": "",
   "disk_image": "osinfo.img",
   "iso_image": "osinfo.iso",
+  "dependencies": [],
   "qemu": "qemu-system-x86_64",
   "memory_mb": 512,
   "cpus": 4,

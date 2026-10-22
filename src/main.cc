@@ -450,8 +450,10 @@ class Cli {
             DebugConfiguration settings(options, project.root());
             ImageLock lock(settings.image);
             project.package();
-            if (settings.boot == "disk") DiskImage::install(settings.base(), settings.image, project.archive());
-            else OpticalImage::install(settings.base(), settings.image, project.archive());
+            auto archives = settings.dependencies;
+            archives.push_back(project.archive().string());
+            if (settings.boot == "disk") DiskImage::install(settings.base(), settings.image, archives);
+            else OpticalImage::install(settings.base(), settings.image, archives);
             if (command != "install") settings.run(command == "debug");
         } else if (command == "build") project.build(); else project.package();
         return 0;

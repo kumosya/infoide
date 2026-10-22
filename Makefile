@@ -7,7 +7,7 @@ ISO ?= $(if $(OSINFO_ISO),$(OSINFO_ISO),$(if $(filter 1,$(WITH_CDROM)),resources
 INPKG ?= $(if $(wildcard ../inpkg/build/linux/inpkg),../inpkg/build/linux/inpkg,inpkg)
 INPKG_ENV = $(if $(findstring /,$(INPKG)),$(abspath $(INPKG)),$(INPKG))
 
-.PHONY: all check check-install check-project check-optical check-inpkg install uninstall installer distribution
+.PHONY: all check check-dependencies check-install check-project check-optical check-inpkg install uninstall installer distribution
 all: build/infoide
 
 build/uninstall-script.h: script/uninstall.sh Makefile
@@ -25,6 +25,9 @@ check-inpkg:
 
 check: build/infoide check-inpkg
 	INPKG="$(INPKG_ENV)" OSINFO_SDK="$(abspath $(SDK))" sh "tests/cli.sh" "$(CURDIR)/build/infoide"
+
+check-dependencies: build/infoide check-inpkg
+	INPKG="$(INPKG_ENV)" OSINFO_SDK="$(abspath $(SDK))" OSINFO_DISK="$(abspath $(DISK))" $(if $(ISO),OSINFO_ISO="$(abspath $(ISO))") sh "tests/dependencies.sh"
 
 check-install: distribution check-inpkg
 	INPKG="$(INPKG_ENV)" OSINFO_EXPECT_CDROM="$(if $(ISO),1,0)" sh tests/distribution.sh

@@ -66,12 +66,24 @@ infoide-debug.json 集中保存测试设置：
 | boot | disk | disk 或 cdrom |
 | disk_template / iso_template | 空 | 空表示使用安装资源；显式路径相对项目根目录 |
 | disk_image / iso_image | osinfo.img / osinfo.iso | 项目根目录的镜像，拒绝项目外路径 |
+| dependencies | [] | 按顺序安装的依赖 `.inpk` 路径；相对路径以项目根目录为准，也可使用绝对路径 |
 | qemu | qemu-system-x86_64 | QEMU 程序 |
 | memory_mb / cpus | 512 / 4 | 虚拟机资源 |
 | display / serial | gtk / stdio | 显示与串口 |
 | gdb_port / wait_for_gdb | 1234 / true | debug 的本地 GDB 端口及启动暂停 |
 
 --debug-config 选择另一份调试配置，--boot、--disk、--iso、--output、--qemu、--headless 覆盖对应设置。输出仍须位于项目根目录；相对镜像路径以项目为基准。run 正常启动 QEMU；debug 开启 GDB，是否暂停由 wait_for_gdb 决定。
+
+`install/run/debug` 先按 `dependencies` 的顺序安装或升级依赖包，再安装当前项目包，硬盘和光盘共用此流程。例如窗口服务器的调试配置可以包含：
+
+```json
+"dependencies": [
+  "lib/osgui-c++/build/packages/libosgui-c++.inpk",
+  "app/tools/build/packages/guiw-app-tools.inpk"
+]
+```
+
+先构建依赖包，再执行 `infoide run`。该配置只引用已有包，不自动构建或下载依赖。未配置时保留原有行为。路径不存在、包损坏或任何安装失败都会停止启动，并保留原输出镜像；所有包在同一个临时镜像中安装成功、读回校验后才发布。
 
 ## 可选光盘
 
@@ -84,5 +96,7 @@ infoide-debug.json 集中保存测试设置：
 ## 开发验证
 
 InfoIDE 自身的 tests/ 保存 CLI、安装器、项目硬盘和可选光盘回归。`make check check-install` 使用 resources/ 验证编译参数、包内容、安装布局和启动脚本。`make check-install WITH_CDROM=1` 额外验证携带 ISO 的发行包。
+
+`make check-dependencies` 使用真实包和硬盘镜像验证依赖安装、升级、配置错误及失败回滚，检查 run/debug 的启动参数。加 `WITH_CDROM=1` 同时检查光盘镜像中的依赖安装和失败回滚。
 
 `make check-project OSINFO_TEST_HOST=/path/to/osinfo-host` 和 `make check-optical WITH_CDROM=1 OSINFO_TEST_HOST=/path/to/osinfo-host` 使用显式提供的开发测试驱动向真实 QEMU 输入命令；发行包和安装流程无需该驱动。测试临时目录通过 TMPDIR 指定，需位于支持 Unix socket 的 Linux 文件系统；WSL 下不要选择 /mnt/d 等 Windows 挂载目录。
