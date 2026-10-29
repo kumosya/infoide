@@ -41,10 +41,10 @@ check-optical: build/infoide check-inpkg
 
 installer: distribution
 
-distribution: build/infoide
+distribution: build/infoide check-inpkg
 	@test -n "$(SDK)" -a -n "$(DISK)" || { echo 'Set SDK=/path/to/sdk DISK=/path/to/osinfo.img [ISO=/path/to/optional.iso]' >&2; exit 2; }
 	@set -eu; stage=$$(mktemp -d build/.distribution.XXXXXX); trap 'rm -rf -- "$$stage"' EXIT; \
-		build/infoide distribution --sdk "$(SDK)" --disk "$(DISK)" $(if $(ISO),--iso "$(ISO)") --output "$$stage/infoide-linux"; \
+		INPKG="$(INPKG_ENV)" build/infoide distribution --sdk "$(SDK)" --disk "$(DISK)" $(if $(ISO),--iso "$(ISO)") --output "$$stage/infoide-linux"; \
 		mv -f "$$stage/infoide-linux.tar.gz" build/infoide-linux.tar.gz
 
 install: distribution

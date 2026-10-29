@@ -11,6 +11,19 @@ class Distribution {
         const auto resources = destination / "lib/osinfo";
         fs::create_directories(destination / "bin"); fs::create_directories(resources);
         fs::copy_file(Resources::executable(), destination / "bin/infoide");
+        const auto packageTool = PackageTools::executable();
+        if (!Process::available(packageTool)) throw std::runtime_error("distribution requires inpkg; set INPKG=/path/to/inpkg");
+        fs::path packagePath = packageTool;
+        if (!packagePath.has_parent_path()) {
+            const char* search = std::getenv("PATH");
+            std::stringstream paths(search ? search : "");
+            std::string directory;
+            while (std::getline(paths, directory, ':')) {
+                const auto candidate = fs::path(directory.empty() ? "." : directory) / packageTool;
+                if (access(candidate.c_str(), X_OK) == 0) { packagePath = candidate; break; }
+            }
+        }
+        fs::copy_file(fs::canonical(packagePath), resources / "inpkg");
         fs::copy(sdk, resources / "sdk", fs::copy_options::recursive);
         fs::copy_file(disk, resources / "osinfo.img");
         if (!iso.empty()) fs::copy_file(iso, resources / "osinfo.iso");
@@ -70,11 +83,11 @@ done
 for tool in g++ gcc debugfs flock qemu-system-x86_64; do
     command -v "$tool" >/dev/null 2>&1 || { echo "missing host dependency: $tool" >&2; exit 1; }
 done
-command -v "${INPKG:-inpkg}" >/dev/null 2>&1 || { echo 'missing host dependency: inpkg; install it or set INPKG=/path/to/inpkg' >&2; exit 1; }
 target="$destdir/usr/local"
 resources="$target/lib/osinfo"
 install -d "$target/bin" "$resources/sdk"
 install -m755 "$source/bin/infoide" "$target/bin/infoide"
+install -m755 "$source/lib/osinfo/inpkg" "$resources/inpkg"
 cp -R "$source/lib/osinfo/sdk/." "$resources/sdk/"
 install -m644 "$source/lib/osinfo/osinfo.img" "$resources/osinfo.img"
 install -m755 "$source/lib/osinfo/run-qemu.sh" "$resources/run-qemu.sh"
@@ -82,7 +95,7 @@ install -m755 "$source/uninstall.sh" "$resources/uninstall.sh"
 if [ -f "$source/lib/osinfo/osinfo.iso" ]; then install -m644 "$source/lib/osinfo/osinfo.iso" "$resources/osinfo.iso"; fi
 printf 'Installed %s/bin/infoide and %s/lib/osinfo/\n' "$target" "$target"
 )SH");
-        for (const auto& path : {destination / "bin/infoide", destination / "install.sh", destination / "uninstall.sh", resources / "run-qemu.sh"}) fs::permissions(path, static_cast<fs::perms>(0755));
+        for (const auto& path : {destination / "bin/infoide", destination / "install.sh", destination / "uninstall.sh", resources / "run-qemu.sh", resources / "inpkg"}) fs::permissions(path, static_cast<fs::perms>(0755));
         Process::run({"tar", "-czf", destination.string() + ".tar.gz", "-C", destination.parent_path().string(), destination.filename().string()}, fs::current_path());
         std::cout << "Linux installer: " << destination.string() + ".tar.gz" << '\n';
     }

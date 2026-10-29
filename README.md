@@ -13,12 +13,12 @@ resources/
   osinfo.iso      # 可选光盘镜像
 ```
 
-InfoIDE 依赖 inpkg 的 Linux 可执行程序。先在 inpkg 源码目录执行 `sudo make install`，将 `inpkg` 安装到 `/usr/local/bin`；也可用 `make install PREFIX=/usr DESTDIR=/暂存目录` 暂存安装。开发时可用 `make INPKG=/path/to/inpkg` 指定可执行文件。
+构建 InfoIDE 发行包时需要 inpkg 的 Linux 可执行程序；Makefile 优先使用相邻 inpkg 项目的构建产物，也可用 `make INPKG=/path/to/inpkg` 指定。发行包携带配套 inpkg，最终用户不需要另行全局安装。
 
 ```sh
 make installer                 # 默认仅携带硬盘模板
 make check check-install       # CLI 与安装器验证
-sudo make install              # 安装 InfoIDE（需先安装 inpkg）
+sudo make install              # 安装 InfoIDE（包含配套 inpkg）
 ```
 
 也可用 `make installer SDK=/path/to/sdk DISK=/path/to/osinfo.img` 指定输入。发行包为 InfoIDE 项目的 build/infoide-linux.tar.gz，解压并运行 `sudo sh infoide-linux/install.sh` 也可以安装。`make install DESTDIR=/暂存目录` 支持其他目录的安装验证。
@@ -35,7 +35,7 @@ sudo make install              # 安装 InfoIDE（需先安装 inpkg）
   osinfo.iso       # 可选
 ```
 
-安装器支持 `--destdir DIR` 暂存打包，不改默认安装路径。宿主需有 gcc/g++、debugfs、flock、QEMU 和 PATH 中的 inpkg；选用光盘时另需 xorriso 和 grub-mkrescue。卸载 InfoIDE 不会移除共享的 inpkg 程序。
+安装器支持 `--destdir DIR` 暂存打包，不改默认安装路径。宿主需有 gcc/g++、debugfs、flock 和 QEMU；选用光盘时另需 xorriso 和 grub-mkrescue。卸载 InfoIDE 不会移除共享的 inpkg 程序。
 
 卸载在 InfoIDE 项目执行 `sudo make uninstall`。也可使用已安装的 `sudo sh /usr/local/lib/osinfo/uninstall.sh`，或解压发行包后运行 `sudo sh infoide-linux/uninstall.sh`。暂存安装对应 `make uninstall DESTDIR=/暂存目录` 或卸载脚本的 `--destdir DIR`。卸载仅清理 /usr/local/bin/infoide 与专用的 /usr/local/lib/osinfo/，保留各项目源码、配置和 IMG/ISO；重复卸载可安全执行。
 
@@ -100,3 +100,9 @@ InfoIDE 自身的 tests/ 保存 CLI、安装器、项目硬盘和可选光盘回
 `make check-dependencies` 使用真实包和硬盘镜像验证依赖安装、升级、配置错误及失败回滚，检查 run/debug 的启动参数。加 `WITH_CDROM=1` 同时检查光盘镜像中的依赖安装和失败回滚。
 
 `make check-project OSINFO_TEST_HOST=/path/to/osinfo-host` 和 `make check-optical WITH_CDROM=1 OSINFO_TEST_HOST=/path/to/osinfo-host` 使用显式提供的开发测试驱动向真实 QEMU 输入命令；发行包和安装流程无需该驱动。测试临时目录通过 TMPDIR 指定，需位于支持 Unix socket 的 Linux 文件系统；WSL 下不要选择 /mnt/d 等 Windows 挂载目录。
+
+### GUI 项目与配套包工具
+
+application target 可设置 `"gui": true`，并在 install 中指定可执行文件目的路径。打包会生成 inpkg 的 `gui=` 入口声明；shared/boot-service 目标不能设置 GUI 标志。GUI target 缺少安装映射时拒绝打包。
+
+Linux 发行包现在携带构建时选用的 inpkg，安装到 `/usr/local/lib/osinfo/inpkg`，InfoIDE 优先使用它，无需单独全局安装。显式 `INPKG` 仍优先于内置工具。

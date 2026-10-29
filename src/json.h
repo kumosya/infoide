@@ -43,6 +43,13 @@ class Json {
         }
         return fallback;
     }
+    bool boolean(const std::string& key,bool fallback=false)const {
+        if(const auto* field=find(key)) {
+            if(const auto* value=std::get_if<bool>(&field->value))return *value;
+            throw std::runtime_error(key+": expected a boolean");
+        }
+        return fallback;
+    }
     std::vector<std::string> strings(const std::string& key) const {
         std::vector<std::string> result;
         if (auto* field = find(key)) {

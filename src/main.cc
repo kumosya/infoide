@@ -189,13 +189,19 @@ class Process {
 
 class PackageTools {
  public:
-    static void run(const Arguments& arguments) {
+    static std::string executable() {
         const char* configured = std::getenv("INPKG");
-        const std::string executable = configured && *configured ? configured : "inpkg";
-        if (!Process::available(executable))
+        if (configured && *configured) return configured;
+        const auto bundled = fs::canonical("/proc/self/exe").parent_path().parent_path() / "lib/osinfo/inpkg";
+        if (Process::available(bundled.string())) return bundled.string();
+        return "inpkg";
+    }
+    static void run(const Arguments& arguments) {
+        const auto tool = executable();
+        if (!Process::available(tool))
             throw std::runtime_error("missing host dependency: inpkg; install it or set INPKG=/path/to/inpkg");
         Arguments command = arguments;
-        command.at(0) = executable;
+        command.at(0) = tool;
         Process::run(command, fs::current_path());
     }
 };
@@ -214,6 +220,7 @@ class Project {
     Json config_;
     std::string name_, cxx_, cc_;
     std::map<std::string, std::string> kinds_;
+    std::set<std::string> graphical_;
     Arguments targets_;
 
     static void append(Arguments& to, const Arguments& from) { to.insert(to.end(), from.begin(), from.end()); }
@@ -339,6 +346,11 @@ class Project {
         for (const auto& target : config_.at("targets").array()) {
             const auto name = Files::identifier(target.at("name").string());
             const auto kind = target.text("kind", "application");
+            if(target.boolean("gui")) {
+                if(kind!="application")throw std::runtime_error("gui requires an application target: "+name);
+                graphical_.insert(name);
+                if(graphical_.size()>1)throw std::runtime_error("one package may declare only one GUI application");
+            }
             if (name == "package.conf" || (kind != "application" && kind != "shared" && kind != "boot-service") || !kinds_.emplace(name, kind).second)
                 throw std::runtime_error("duplicate, reserved or unsupported target: " + name);
         }
@@ -357,7 +369,18 @@ class Project {
         build();
         const auto& install = config_.at("install").object();
         if (install.empty()) throw std::runtime_error("install mappings must not be empty");
+        for (const auto& application : graphical_)
+            if (!install.count(application)) throw std::runtime_error("GUI target requires an install mapping: " + application);
         std::string manifest = "name=" + name_ + "\nversion=" + config_.text("version", "1") + "\n";
+        for(const auto& application:config_.at("targets").array())if(application.boolean("gui")) {
+            for(const auto* key:{"gui-id","gui-name-en","gui-name-zh","gui-name-ja","gui-icon","gui-notification-icon"}) {
+                const auto value=application.text(key);
+                if(value.empty())continue;
+                if(value.size()>383 || value.find_first_of("\r\n")!=std::string::npos || value.find('\0')!=std::string::npos)
+                    throw std::runtime_error(std::string("invalid GUI metadata: ")+key);
+                manifest+=std::string(key)+"="+value+"\n";
+            }
+        }
         Arguments members{"package.conf"};
         std::set<std::string> destinations;
         for (const auto& [source, value] : install) {
@@ -377,6 +400,7 @@ class Project {
             if (!fs::is_regular_file(staged) || fs::is_symlink(staged)) throw std::runtime_error("invalid package payload: " + source);
             fs::permissions(staged, static_cast<fs::perms>(binary ? 0755 : 0644));
             manifest += std::string(binary ? "bin=" : "file=") + target + "\ninstall=" + source + " -> " + target + "\n";
+            if(graphical_.count(source))manifest+="gui="+target+"\n";
             members.push_back(source);
         }
         TemporaryFile config(payload_ / "package.conf"); Files::write(config.path(), manifest); config.publish(payload_ / "package.conf");
